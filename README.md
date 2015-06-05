@@ -46,6 +46,6 @@ or
 
 Thanks for downloading.
 
-- Tucker McClure
+Tucker McClure
 
 Copyright 2013-2015, The MathWorks, Inc. and Tucker McClure

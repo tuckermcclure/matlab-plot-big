@@ -44,8 +44,6 @@ or
 >> help LinePlotExplorer
 ```
 
-for more info.
-
 Thanks for downloading.
 
 Tucker McClure

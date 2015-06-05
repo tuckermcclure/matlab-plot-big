@@ -3,7 +3,9 @@
 Makes large MATLAB line plots much faster.
 
 This simple tool intercepts data going into a plot and reduces it to the smallest possible set that looks identical given the number of pixels available on the screen. It then updates the data as a user zooms or pans. This is useful when a user must plot a very large amount of data and explore it visually. 
+
 This works with MATLAB's built-in line plot functions, allowing the functionality of those to be preserved. 
+
 Instead of:
 
 ```

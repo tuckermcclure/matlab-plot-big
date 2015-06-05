@@ -44,6 +44,8 @@ or
 >> help LinePlotExplorer
 ```
 
+File Exchange page: http://www.mathworks.com/matlabcentral/fileexchange/40790
+
 Thanks for downloading.
 
 Tucker McClure

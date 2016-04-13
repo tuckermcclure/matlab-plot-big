@@ -26,7 +26,7 @@ h = reduce_plot(t, x(1, :), 'b:', t, x(2, :), t, x(3, :), 'r--*');
 
 This function works on plots where the "x" data is always increasing, which is the most common, such as for time series.
 
-![Example Plot](http://www.mathworks.com/matlabcentral/fileexchange/screenshots/21582/preview.jpg)
+![Example Plot](screenshot.png)
 
 For more information, see:
 

@@ -463,12 +463,21 @@ classdef LinePlotReducer < handle
             
             % Listen for changes on the figure itself.
             o.figure_listener = addlistener(o.h_figure, size_cb{:}, ...
-                                            @(~,~) o.RefreshData);
+                @(~,~) o.RefreshData);
+            
+            % Define DeletePlot as Nested Function, so the figure can be deleted 
+            % even if LinePlotReducer.m is not on Matlab's search path anymore.
+            function DeletePlot(o,k)
+                o.deleted_plots(k) = true;
+                if all(o.deleted_plots)
+                    delete(o.figure_listener);
+                end
+            end
             
             % When all of our managed plots are deleted, we need to erase
             % ourselves, so we'll keep track when each is deleted.
             for k = 1:length(o.h_plot)
-                set(o.h_plot(k), 'DeleteFcn', @(~,~) o.DeletePlot(k));
+                set(o.h_plot(k), 'DeleteFcn', @(~,~) DeletePlot(o,k));
             end
             o.deleted_plots = false(1, length(o.h_plot));
             
@@ -483,13 +492,6 @@ classdef LinePlotReducer < handle
     end
     
     methods
-        
-        function DeletePlot(o, k)
-            o.deleted_plots(k) = true;
-            if all(o.deleted_plots)
-                delete(o.figure_listener);
-            end 
-        end
         
         % Redraw all of the data.
         function RefreshData(o)

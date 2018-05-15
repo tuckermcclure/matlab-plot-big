@@ -122,6 +122,11 @@ classdef LinePlotReducer < handle
 %
 % Copyright 2015, The MathWorks, Inc. and Tucker McClure
 
+% Edit Peter Cook 2018
+% 1. Allow `datetime` class input for x
+% 2. Allow data to be either "long" (reduce x-dimension) 
+%    or "tall" (reduce y-dimension). 
+
     properties
         
         % Handles
@@ -146,8 +151,10 @@ classdef LinePlotReducer < handle
                                  % LinePlotReducer.
         
         % Last updated state
-        last_width = 0;          % We only update when the width and
-        last_lims  = [0 0];      % limits change.
+        last_width  = 0;          % We only update when the width and
+        last_xlim   = [0 0];      % limits change.
+        last_height = 0;
+        last_ylim   = [0 0];
         
         % We need to keep track of the figure listener so that we can
         % delete it later.
@@ -156,6 +163,14 @@ classdef LinePlotReducer < handle
         % We'll delete the figure listener once all of the plots we manage
         % have been deleted (cleared from axes, closed figure, etc.).
         deleted_plots;
+        
+        % Determine if dataset is "long" or "tall"
+        % We need to capture both of these because should they both take on a
+        % false value, we need to throw an error. This should really be an
+        % XOR check, but for now assume that if they both take on a true
+        % value, we will just ignore the tall dimension for the reduction.
+        isLong = true;
+        isTall = true;
         
     end
     
@@ -272,7 +287,7 @@ classdef LinePlotReducer < handle
             for k = start:nargin+1
 
                 % If it's a bunch of numbers...
-                if k <= nargin && isnumeric(varargin{k})
+                if k <= nargin && (isnumeric(varargin{k}) || isdatetime(varargin{k}))
 
                     % If we already have an x, then this must be y.
                     if km1_was_x
@@ -370,17 +385,34 @@ classdef LinePlotReducer < handle
             y_r = cell(1, length(o.y));
 
             % Get the axes width once.
-            width = get_axes_width(o.h_axes);
+            %width = get_axes_width(o.h_axes);
+            axPos = round(getpixelposition(o.h_axes));
+            width = axPos(3);
             o.last_width = width;
-            o.last_lims  = [-inf inf];
-
+            o.last_xlim  = [-inf inf];
+            height = axPos(4);
+            o.last_height = height;
+            o.last_ylim = [-inf inf];
+            o.CheckDataShape();
+            
             % Reduce the data!
-            for k = 1:length(o.y)
-                [x_r{k}, y_r{k}] = reduce_to_width(...
-                    o.x{o.y_to_x_map(k)}(:), ...
-                    o.y{k}(:), ...
-                    width, ...
-                    [-inf inf]);
+            if o.isLong
+                for k = 1:length(o.y)
+                    [x_r{k}, y_r{k}] = reduce_to_width(...
+                        o.x{o.y_to_x_map(k)}(:), ...
+                        o.y{k}(:), ...
+                        width, ...
+                        [-inf inf]);
+                end
+            else
+                %OK to ignore the logical value of isTall if isLong == true
+                for k = 1:length(o.y)
+                    [y_r{k}, x_r{k}] = reduce_to_width(...
+                        o.y{k}(:), ...
+                        o.x{o.y_to_x_map(k)}(:), ...
+                        height, ...
+                        [-inf inf]);
+                end
             end
 
             % If taking over a plot, just update it. Otherwise, plot it.
@@ -518,10 +550,14 @@ classdef LinePlotReducer < handle
             % Get the new limits. Sometimes there are multiple axes stacked
             % on top of each other. Just grab the first. This is really
             % just for plotyy.
-            lims = get(o.h_axes(1), 'XLim');
+            xL = get(o.h_axes(1), 'XLim');
+            yL = get(o.h_axes(1), 'YLim');
 
             % Get axes width in pixels.
-            width = get_axes_width(o.h_axes(1));
+            %width = get_axes_width(o.h_axes(1));
+            axPos  = round(getpixelposition(o.h_axes(1)));
+            width  = axPos(3);
+            height = axPos(4);
             
             % Just in case...
             if width < 0
@@ -530,24 +566,30 @@ classdef LinePlotReducer < handle
             end
             
             % Return if there's nothing to do.
-            if width == o.last_width && all(lims == o.last_lims)
+            if width == o.last_width && all(xL == o.last_xlim)
                 o.busy = false;
                 return;
             end
             
             % Record the last values for which we resized the data so we
             % can skip inconsequential updates later.
-            o.last_width = width;
-            o.last_lims  = lims;
+            o.last_width  = width;
+            o.last_xlim   = xL;
+            o.last_height = height;
+            o.last_ylim   = yL;
             
             % For all data we manage...
             for k = 1:length(o.h_plot)
-                
                 % Reduce the data.
-                [x_r, y_r] = reduce_to_width(o.x{o.y_to_x_map(k)}(:), ...
-                                             o.y{k}(:), ...
-                                             width, lims);
-                
+                if o.isLong
+                    [x_r, y_r] = reduce_to_width(o.x{o.y_to_x_map(k)}(:), ...
+                                                 o.y{k}(:), ...
+                                                 width, xL);
+                else
+                    [y_r, x_r] = reduce_to_width(o.y{k}(:), ...
+                                                 o.x{o.y_to_x_map(k)}(:), ...
+                                                 height, yL);
+                end
                 % Update the plot.
                 set(o.h_plot(k), 'XData', x_r, 'YData', y_r);
                 
@@ -568,6 +610,21 @@ classdef LinePlotReducer < handle
             % in size, so we don't need to do this.
             if verLessThan('matlab', '8.4')
                 o.calls_to_ignore = o.calls_to_ignore + 1;
+            end
+            
+        end
+        
+        function CheckDataShape(o)
+            %check to see if the data is "long" or "tall"
+            for k = 1:length(o.y)
+                o.isLong = o.isLong && all(diff(o.x{o.y_to_x_map(k)}(:))>0);
+                o.isTall = o.isTall && all(diff(o.y{k}(:))>0);
+            end
+            if or(o.isLong,o.isTall)
+                %pass
+            else
+                error('LinePlotReducer:CheckDataShape:BadShape',...
+                    'Error: Input Data is Neither Long nor Tall.')
             end
             
         end

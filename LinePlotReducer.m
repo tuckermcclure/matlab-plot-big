@@ -527,7 +527,21 @@ classdef LinePlotReducer < handle
         
         % Redraw all of the data.
         function RefreshData(o)
-
+            
+            persistent lastTime
+            try
+                tnow = datenummx(clock);
+            catch
+                tnow = now();
+            end
+            
+            %1/864000 = 10 updates per second
+            if ~isempty(lastTime) && tnow - lastTime < 1/864000
+                o.busy = false;  % re-enable callback
+                return;
+            end
+            lastTime = tnow;
+            
             % When we set the axes units to 'pixels' and back, it will
             % trigger a callback each time for *both* 'Position' and
             % 'Units' (and in that order). Since we've set up callbacks to
@@ -546,6 +560,8 @@ classdef LinePlotReducer < handle
 
             % We're busy now.
             o.busy = true;
+            
+
             
             % Get the new limits. Sometimes there are multiple axes stacked
             % on top of each other. Just grab the first. This is really

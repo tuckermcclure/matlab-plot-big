@@ -44,7 +44,12 @@ function [x_reduced, y_reduced] = reduce_to_width(x, y, width, lims)
     end
 
     % Reduce the data to the new axis size.
-    x_reduced = nan(n_points, size(y, 2));
+    if isdatetime(x)
+        %preallocate NaT if x is datetime class
+        x_reduced = NaT(n_points, size(y, 2));
+    else
+        x_reduced = nan(n_points, size(y, 2));
+    end
     y_reduced = nan(n_points, size(y, 2));
     for k = 1:size(y, 2)
 
@@ -58,9 +63,19 @@ function [x_reduced, y_reduced] = reduce_to_width(x, y, width, lims)
             xt = x(:, k);
 
             % Map the lower and upper limits to indices.
+            % Skip binary search if -inf or inf : avoids error thrown for
+            % datetime class 
             nx = size(x, 1);
-            lower_limit      = binary_search(xt, lims(1), 1,           nx);
-            [~, upper_limit] = binary_search(xt, lims(2), lower_limit, nx);
+            if isinf(lims(1))
+                lower_limit = 1;
+            else
+                lower_limit      = binary_search(xt, lims(1), 1,           nx);
+            end
+            if isinf(lims(2))
+                upper_limit = length(xt);
+            else
+                [~, upper_limit] = binary_search(xt, lims(2), lower_limit, nx);
+            end
             
             % Make the windows mapping to each pixel.
             x_divisions = linspace(x(lower_limit, k), ...

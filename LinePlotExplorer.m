@@ -43,6 +43,11 @@ classdef LinePlotExplorer < handle
 %
 % Tucker McClure
 % Copyright 2013, The MathWorks, Inc.
+% 
+% Edit Peter Cook 2018
+% Only trigger relevant (wbdf, wbmf) callbacks if an axes is clicked 
+% directly (whoClicked...) otherwise this can interfere with callbacks
+% placed directly on graphics objects (like imrect)
 
     properties
         
@@ -132,7 +137,7 @@ classdef LinePlotExplorer < handle
         
         % When the user moves the mouse wheel...
         function Scroll(o, h, event, varargin)
-
+            
             % Get current axes for this figure.
             h_axes = get(o.h_fig, 'CurrentAxes');
             
@@ -153,37 +158,40 @@ classdef LinePlotExplorer < handle
             end
             
             % Get where and in what direction user scrolled.
-            exponent = double(event.VerticalScrollCount);
-            
-            % Calculate new limits.
-            range    = diff(old_x_lims);
-            alpha    = (point(1) - old_x_lims(1)) / range;
-            new_lims = 2.25^exponent * range *[-alpha 1-alpha] + point(1);
-            
-            % Don't zoom out too far.
-            new_lims = max(min(new_lims, o.x_max), o.x_min);
-            
-            % Update the axes.
-            set(h_axes, 'XLim', new_lims);
-            
-            % If there's a callback attachment, execute it.
-            execute_callback(o.wswf, h, event, varargin{:});
+            if ismember(event.VerticalScrollCount,[-1,1])
+                exponent = double(event.VerticalScrollCount);
+                
+                % Calculate new limits.
+                range    = diff(old_x_lims);
+                alpha    = (point(1) - old_x_lims(1)) / range;
+                new_lims = 2.25^exponent * range *[-alpha 1-alpha] + point(1);
 
+                % Don't zoom out too far.
+                new_lims = max(min(new_lims, o.x_max), o.x_min);
+
+                % Update the axes.
+                set(h_axes, 'XLim', new_lims);
+
+                % If there's a callback attachment, execute it.
+                execute_callback(o.wswf, h, event, varargin{:});
+            end
+            
         end
         
         % The user has clicked and is holding.
         function ButtonDown(o, h, event, varargin)
-            
-            % Record what the axes were when the user clicked and where the
-            % user clicked.
-            o.button_down_axes   = get(o.h_fig, 'CurrentAxes');
-            point                = get(o.button_down_axes, 'CurrentPoint');
-            o.button_down_point  = point(1, 1:2);
-            o.button_down        = true;
-            
-            % If there's a callback attachment, execute it.
-            execute_callback(o.wbdf, h, event, varargin{:});
-            
+            whoClicked = event.HitObject;
+            if isa(whoClicked,'matlab.graphics.axis.Axes')
+                % Record what the axes were when the user clicked and where the
+                % user clicked.
+                o.button_down_axes   = get(o.h_fig, 'CurrentAxes');
+                point                = get(o.button_down_axes, 'CurrentPoint');
+                o.button_down_point  = point(1, 1:2);
+                o.button_down        = true;
+
+                % If there's a callback attachment, execute it.
+                execute_callback(o.wbdf, h, event, varargin{:});
+            end
         end
         
         % The user has released the button.
@@ -198,9 +206,9 @@ classdef LinePlotExplorer < handle
         
         % When the user moves the mouse with the button down, pan.
         function Motion(o, h, event, varargin)
-            
-            if o.button_down
-
+            whoClicked = event.HitObject;
+            if o.button_down && isa(whoClicked,'matlab.graphics.axis.Axes')
+                
                 % Get the mouse position and movement from original point.
                 point    = get(o.button_down_axes, 'CurrentPoint');
                 movement = point(1, 1) - o.button_down_point(1);
@@ -214,12 +222,12 @@ classdef LinePlotExplorer < handle
                 if new_lims(2) > o.x_max
                     new_lims = o.x_max - [diff(new_lims) 0];
                 end
-
+                
                 % Update the axes.
                 set(o.button_down_axes, 'XLim', new_lims);
-
+                
             end
-
+            
             % If there's a callback attachment, execute it.
             execute_callback(o.wbmf, h, event, varargin{:});
             
